@@ -46,7 +46,7 @@ using MarketEquilibria
         end
     end
 
-    @testset "CES Partial substitutes: ρ ∈ (0, 1)" begin
+    @testset "CES partial substitutes: ρ ∈ (0, 1)" begin
         for _ in 1:samp
             (n, m) = rand(10:50, 2)
 
@@ -60,7 +60,7 @@ using MarketEquilibria
         end
     end
 
-    @testset "CES Complementarity fx: ρ < 0" begin
+    @testset "CES complementarity fx: ρ < 0" begin
         for _ in 1:samp
             (n, m) = rand(10:50, 2)
 
