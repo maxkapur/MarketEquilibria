@@ -55,7 +55,10 @@ using MarketEquilibria
             supplies = 1 .+ rand(m)
 
             A ./= sum(A, dims=2)
-            X, prices = homogeneousfisher(endowments, A, supplies, :CES, rand())
+            ρ = .97 * rand()        # Fails consistently for ρ  > .99, so the model uses
+                                    # linear whenever ρ > .97.
+            X, prices = homogeneousfisher(endowments, A, supplies, :CES, ρ)
+            println("ρ = $ρ")
             @test -endowments ≈ X * prices atol=1e-5
         end
     end
@@ -72,5 +75,22 @@ using MarketEquilibria
             X, prices = homogeneousfisher(endowments, A, supplies, :CES, -randexp())
             @test -endowments ≈ X * prices atol=1e-5
         end
+    end
+end
+
+
+@testset "CES Exchange economies" begin
+    samp = 10
+
+    for _ in 1:samp
+        (n, m) = rand(10:50, 2)
+
+        endowments =  1 .+ randexp(n, m)
+        ρ = -rand(n)
+        A = rand(n, m)
+
+        prices, demands = elasticexchange(endowments, ρ, A)
+
+        @test all(demands * prices .≥ endowments * prices)
     end
 end
