@@ -78,9 +78,9 @@ function exchange(endowments::Array{Float64,2},
     if ρ == :linear
         @variable(model, ψ[1:m])
         @variable(model, X[1:n, 1:m], lower_bound=0)
-        @NLconstraint(model, IndRat[i in 1:n, j in 1:m], sum(A[i, k] * X[i, k] for k in 1:m) ≥
-                                                         A[i, j] * sum(endowments[i, k] * exp(ψ[k] - ψ[j])
-                                                                       for k in 1:m))
+        @NLconstraint(model, IndividualRationality[i in 1:n, j in 1:m],
+                        sum(A[i, k] * X[i, k] for k in 1:m) ≥
+                        A[i, j] * sum(endowments[i, k] * exp(ψ[k] - ψ[j]) for k in 1:m))
         @constraint(model, Supply[j in 1:m], sum(X[i, j] for i in 1:n) ==
                                              sum(endowments[i, j] for i in 1:n))
 
@@ -120,5 +120,94 @@ function exchange(endowments::Array{Float64,2},
     return prices, demands
 end
 
+#= 6.6.1
+function production(endowments::Array{Float64,2},
+                    A_consumers::Array{Float64,2},
+                    A_producers::Array{Float64,2},
+                    ρ_consumers::Array{Float64,1},
+                    ρ_producers::Array{Float64,1},
+                    o_producers::Array{Int,1})#::Tuple{Array{Float64,1},Array{Float64,2}}
+
+    (n, m) = size(A_consumers)
+    (l, ) = size(ρ_producers)
+
+    @assert size(A_producers) == (l, m)   "Dim mismatch between A_consumers and A_producers"
+    @assert size(endowments) == (n, m)    "Dim mismatch between A_consumers and endowments"
+    @assert size(ρ_consumers) == (n, )    "Dim mismatch between A_consumers and ρ_consumers"
+    @assert size(o_producers) == (l, )    "Dim mismatch between o and ρ_producers"
+    @assert all(0 .< ρ_consumers .< 1)    "Need ρ ∈ (0, 1)"
+    @assert all(0 .< ρ_producers .< 1)    "Need ρ ∈ (0, 1)"
+
+    A = vcat(A_producers, A_consumers)
+    w = hcat(endowments, zeros(n, l))
+    ρ = vcat(ρ_consumers, ρ_producers)
+    σ = 1 ./ (1 .- ρ)
+    o = vcat(o_producers, m .+ (1:n))
+
+    # Comparison idx since comparison forbidden in lincon
+    O = [o[k] == j for k in 1:l, j in 1:m]
+
+    model = Model(Ipopt.Optimizer)
+    # set_optimizer_attribute(model, "print_level", 0)
+    set_optimizer_attribute(model, "nlp_scaling_method", "none")
+
+    @variable(model, ψ[1:m + n], lower_bound=0)
+    @variable(model, x[1:m + n], lower_bound=0)
+    @variable(model, Z[1:l + n, 1:m], lower_bound=0)
+    @variable(model, q[1:l + n], lower_bound=0)
+
+    @NLconstraint(model, ConsumerRationality[i in 1:n],                   # 6.10
+                    exp(ψ[m + i]) * x[m + i] ≥ # or ==
+                    sum(exp(ψ[j]) * w[i, j] for j in 1:m))
+    @NLconstraint(model, ProducerSolvency[k in 1:l + n],                  # 6.11
+                    q[k] ≤
+                    sum(A[k, j] * x[j] ^ ρ[k] for j in 1:m) ^ (1 / ρ[k]))
+    @NLconstraint(model, ProducerRationality[k in 1:l + n],               # 6.12
+                    exp(ψ[o[k]] * (1 - σ[k])) ≥
+                    sum(A[k, j] ^ σ[k] * exp(ψ[j] * (1 - σ[k])) for j in 1:m))
+    @constraint(model, MarketClearing[j in 1:m],                          # 6.13
+                    sum(Z[k, j] for k in 1:l + n) ≥
+                    sum(w[i, j] for i in 1:n) + sum(O[k, j] * q[k] for k in 1:l))
+                                            # Equiv
+                                            # + sum((o[k] == j) * q[k] for k in 1:l + n))
+    @constraint(model, Supply[i in 1:n], x[m + i] ≤ q[l + i])             # 6.14
+
+    #=  Final constraint given in final paragraph of 154. This should be redundant, but
+        aids computation.                   =#
+    @NLconstraint(model, ZeroProfit[k in 1:l + n],
+                    sum(exp(ψ[j]) * Z[k, j] for j in 1:m) == exp(ψ[o[k]]) * q[k])
+
+    optimize!(model)
+    prices = exp.(value.(ψ)[1:m])
+    demands = value.(x)[m + 1:end]
+    inputs = value.(Z)[l + 1:end, :]
+
+    return prices, demands, inputs
+end
+
+
+(n, m) = rand(5:10, 2)
+l = rand(5:m)
+
+endowments =  1 .+ randexp(n, m)
+A_consumers = rand(n, m)
+A_producers = rand(l, m)
+ρ_consumers = .25 .+ .5 * rand(n)
+ρ_producers = .25 .+ .5 * rand(l)
+o_producers = randperm(m)[1:l]          # Index of what producers produce.
+
+
+o = vcat(o_producers, m .+ (1:n))
+
+O = [o[k] == j for k in 1:l, j in 1:m]
+
+
+
+prices, demands, inputs = production(endowments, A_consumers, A_producers,
+                             ρ_consumers, ρ_producers, o_producers)
+println(inputs * prices)
+println(endowments * prices)
+
+=#
 
 end
