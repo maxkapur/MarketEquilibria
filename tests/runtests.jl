@@ -10,7 +10,7 @@ using MarketEquilibria
             (n, m) = rand(10:50, 2)
 
             endowments =  1 .+ randexp(n)
-            A = rand(n, m)
+            A = .25 .+ 0.5 .* rand(n, m)    # Yields better conditioning
             supplies = 1 .+ rand(m)
 
             X, prices = homogeneousfisher(endowments, A, supplies, :linear)
@@ -37,7 +37,7 @@ using MarketEquilibria
             (n, m) = rand(10:50, 2)
 
             endowments =  1 .+ randexp(n)
-            A = rand(n, m)
+            A = .25 .+ 0.5 .* rand(n, m)
             supplies = 1 .+ rand(m)
 
             A ./= sum(A, dims=2)

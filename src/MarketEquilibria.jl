@@ -21,8 +21,8 @@ function homogeneousfisher(endowments::Array{Float64,1},
     @assert form in [:linear, :CES, :cobb_douglas, :leontief] "Unknown form"
     if form == :cobb_douglas
         ρ = 1e-8          # Ideally 0
-    elseif form == :leonteif
-        ρ = -10           # Ideally -∞
+    # elseif form == :leonteif
+    #     ρ = -10           # Ideally -∞
     end
 
     (n, m) = size(A)
@@ -42,6 +42,11 @@ function homogeneousfisher(endowments::Array{Float64,1},
         # Very bad results if you allow the default scaling 🐸☕️
         set_optimizer_attribute(model, "nlp_scaling_method", "none")
         @NLobjective(model, Max, sum(endowments[i] * log(sum(A[i, j] * X[i, j] for j in 1:m)) for i in 1:n))
+    elseif form == :leontief
+        @variable(model, t)
+        @objective(model, Max, t)
+        @NLconstraint(model, tLessThan[j in 1:m],
+                    t ≤ sum(endowments[i] * log(A[i, j] * X[i, j]) for i in 1:n))
     else
         @NLobjective(model, Max, sum(endowments[i] * log(sum(A[i, j] * X[i, j] ^ ρ for j in 1:m) ^ (1 / ρ)) for i in 1:n))
     end
