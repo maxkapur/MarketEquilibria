@@ -2,6 +2,7 @@ using MarketEquilibria
 using DelimitedFiles
 using Random
 using Plots
+using Plots.PlotMeasures
 
 form = [:linear, :CES, :CES, :CES, :cobb_douglas,
         :CES, :CES, :CES, :CES, :CES, :leontief]
@@ -67,6 +68,7 @@ q = plot(1:samp,
          cumsum(X1[end:-1:1, :], dims=1)'[:,end:-1:1],
          fill=0,
          xlim=(1, samp),
+         right_margin=5mm,
          ylim=(0, 1),
          xticks=(1:samp, rho_label),
          xlabel="ρ",
