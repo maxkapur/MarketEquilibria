@@ -64,7 +64,7 @@ X1 = X[1, :, :] ./ sum(X[1, :, :], dims = 1)
 X1A = round.(A[1, :], digits=4)
 
 q = plot(1:samp,
-         cumsum(X1, dims=1)'[:,end:-1:1],
+         cumsum(X1[end:-1:1, :], dims=1)'[:,end:-1:1],
          fill=0,
          # fillcolor=[:green :red],
          xticks=(1:samp, rho_label),
@@ -74,7 +74,7 @@ q = plot(1:samp,
          lc=:black, lw=.5,
          title="Equilibrium allocation for homogeneous CES utility",
          titlefontsize=12,
-         legend=:bottom,
+         legend=:top,
          label=reshape(["x$i, a = $(X1A[i])" for i in 1:n], 1, :))
 
 savefig(q, "examples/Fisher/XPlot.png")
