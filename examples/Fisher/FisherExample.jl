@@ -2,7 +2,6 @@ using MarketEquilibria
 using DelimitedFiles
 using Random
 using Plots
-using LaTeXStrings
 
 form = [:linear, :CES, :CES, :CES, :cobb_douglas,
         :CES, :CES, :CES, :CES, :CES, :leontief]
@@ -44,19 +43,39 @@ end
 writedlm("examples/Fisher/out/X.dat", X)
 writedlm("examples/Fisher/out/prices.dat", prices)
 
-A_bar = sum(A, dims=1) / m
-A_bar = round.(A_bar, digits=4)
+#A_bar = sum(A, dims=1) / m
+A_bar = round.(A' * endowments, digits=4)
 
-plot(1:samp,
-     prices',
-     xticks=(1:samp, rho_label),
-     xlabel="ρ",
-     ylabel="price",
-     linestyle=[:dash :dot :solid],
-     title="Homogenous Fisher equilibria for CES utility, $m players, $n resources",
-     titlefontsize=12,
-     legend=:topleft,
-     label=reshape(["π$i, Ā = $(A_bar[i])" for i in 1:n], 1, :))
+p = plot(1:samp,
+         prices',
+         xticks=(1:samp, rho_label),
+         xlabel="ρ",
+         ylabel="price",
+         linestyle=[:dash :dot :solid],
+         title="Equilibrium price for homogeneous CES utility, $m players, $n resources",
+         titlefontsize=12,
+         legend=:topleft,
+         label=reshape(["π$i, ā = $(A_bar[i])" for i in 1:n], 1, :))
 
-savefig("examples/Fisher/EqPlot.png")
-savefig("examples/Fisher/EqPlot.pdf")
+savefig(p, "examples/Fisher/EqPlot.png")
+savefig(p, "examples/Fisher/EqPlot.pdf")
+
+X1 = X[1, :, :] ./ sum(X[1, :, :], dims = 1)
+X1A = round.(A[1, :], digits=4)
+
+q = plot(1:samp,
+         cumsum(X1, dims=1)'[:,end:-1:1],
+         fill=0,
+         # fillcolor=[:green :red],
+         xticks=(1:samp, rho_label),
+         xlabel="ρ",
+         ylabel="Player 1’s optimal allocation",
+         ls=:solid,
+         lc=:black, lw=.5,
+         title="Equilibrium allocation for homogeneous CES utility",
+         titlefontsize=12,
+         legend=:bottom,
+         label=reshape(["x$i, a = $(X1A[i])" for i in 1:n], 1, :))
+
+savefig(q, "examples/Fisher/XPlot.png")
+savefig(q, "examples/Fisher/XPlot.pdf")
