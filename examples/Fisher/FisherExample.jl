@@ -2,11 +2,16 @@ using MarketEquilibria
 using DelimitedFiles
 using Random
 using Plots
+using LaTeXStrings
 
-form = [:linear, :CES, :CES, :CES, :cobb_douglas, :CES, :CES, :CES, :CES]
-rho = [1, .75, .5, .25, 0, -1, -2, -5, -10]
+form = [:linear, :CES, :CES, :CES, :cobb_douglas,
+        :CES, :CES, :CES, :CES, :CES, :leontief]
+# Rho value ignored for anything other than :CES
+rho = [000, .75, .5, .25, 000, -0.5,
+       -1., -2, -5, -10, 000]
 rho_label = ["Linear", "0.75", "0.5", "0.25",
-             "Cobb–\nDouglas", "-1.0", "-2.0", "-5.0", "-10.0"]
+             "Cobb–\nDouglas", "-0.5", "-1.0", "-2.0",
+             "-5.0", "-10.0", "Leontief"]
 samp = size(rho)[1]
 
 m, n = 4, 6
@@ -16,13 +21,13 @@ m, n = 4, 6
 # A ./= sum(A, dims=2)
 # supplies = 1 .+ rand(n)
 #
-# writedlm("examples/Fisher/endowments.dat", endowments)
-# writedlm("examples/Fisher/A.dat", A)
-# writedlm("examples/Fisher/supplies.dat", supplies)
+# writedlm("examples/Fisher/in/endowments.dat", endowments)
+# writedlm("examples/Fisher/in/A.dat", A)
+# writedlm("examples/Fisher/in/supplies.dat", supplies)
 
-endowments = reshape(readdlm("examples/Fisher/endowments.dat"), :)
-A          = readdlm("examples/Fisher/A.dat")
-supplies   = reshape(readdlm("examples/Fisher/supplies.dat"), :)
+endowments = reshape(readdlm("examples/Fisher/in/endowments.dat"), :)
+A          = readdlm("examples/Fisher/in/A.dat")
+supplies   = reshape(readdlm("examples/Fisher/in/supplies.dat"), :)
 
 prices = zeros(n, samp)
 X      = zeros(m, n, samp)
@@ -36,12 +41,22 @@ for i in 1:samp
     @assert signal "Something went wrong; rho = $(rho[i])"
 end
 
+writedlm("examples/Fisher/out/X.dat", X)
+writedlm("examples/Fisher/out/prices.dat", prices)
+
+A_bar = sum(A, dims=1) / m
+A_bar = round.(A_bar, digits=4)
+
 plot(1:samp,
      prices',
      xticks=(1:samp, rho_label),
      xlabel="ρ",
      ylabel="price",
-     title="Homogenous Fisher equilibria for CES utility")
+     linestyle=[:dash :dot :solid],
+     title="Homogenous Fisher equilibria for CES utility, $m players, $n resources",
+     titlefontsize=12,
+     legend=:topleft,
+     label=reshape(["π$i, Ā = $(A_bar[i])" for i in 1:n], 1, :))
 
 savefig("examples/Fisher/EqPlot.png")
 savefig("examples/Fisher/EqPlot.pdf")

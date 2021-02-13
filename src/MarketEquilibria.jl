@@ -17,12 +17,10 @@ function homogeneousfisher(endowments::Array{Float64,1},
                            A::Array{Float64,2},
                            supplies::Array{Float64,1},
                            form=:linear,
-                           ρ::Float64=0.5)::Tuple{Array{Float64,2},Array{Float64,1}}
+                           ρ::Union{Float64,Nothing}=0.5)::Tuple{Array{Float64,2},Array{Float64,1}}
     @assert form in [:linear, :CES, :cobb_douglas, :leontief] "Unknown form"
     if form == :cobb_douglas
         ρ = 1e-8          # Ideally 0
-    # elseif form == :leonteif
-    #     ρ = -10           # Ideally -∞
     end
 
     (n, m) = size(A)
