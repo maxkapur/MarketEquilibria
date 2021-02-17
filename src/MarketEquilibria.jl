@@ -4,7 +4,7 @@ using Random
 using JuMP
 using Ipopt
 
-export homogeneousfisher, exchange
+export homogeneousfisher, exchange, production
 
 """
     homogeneousfisher(endowments, A, supplies, form, ρ)
@@ -17,7 +17,8 @@ function homogeneousfisher(endowments::Array{Float64,1},
                            A::Array{Float64,2},
                            supplies::Array{Float64,1},
                            form=:linear,
-                           ρ::Union{Float64,Nothing}=0.5)::Tuple{Array{Float64,2},Array{Float64,1}}
+                           ρ::Union{Float64,Nothing}=0.5)::Tuple{Array{Float64,2},
+                                                                 Array{Float64,1}}
     @assert form in [:linear, :CES, :cobb_douglas, :leontief] "Unknown form"
     if form == :cobb_douglas
         ρ = 1e-8          # Ideally 0
@@ -53,6 +54,7 @@ function homogeneousfisher(endowments::Array{Float64,1},
         # @NLobjective(model, Max, sum(endowments[i] * log(prod(X[i, j] ^ A[i, j] for j in 1:m)) for i in 1:n))
 
         # Explicit Leontief is as follows, but minimum() not allowed by JuMP.
+        # Got around this using the linearization trick.
         # @NLobjective(model, Max, sum(endowments[i] * log(minimum(A[i, j] * X[i, j] for j in 1:m)) for i in 1:n))
 
         # Attempt at "softmin" differential substitute; returns errors.
@@ -71,7 +73,8 @@ here `ρ` is a vector of CES parameters used by each player. Or pass `ρ=:linear
 """
 function exchange(endowments::Array{Float64,2},
                   A::Array{Float64,2},
-                  ρ::Union{Array{Float64,1},Symbol}=:linear)::Tuple{Array{Float64,1},Array{Float64,2}}
+                  ρ::Union{Array{Float64,1},Symbol}=:linear)::Tuple{Array{Float64,1},
+                                                                    Array{Float64,2}}
     (n, m) = size(A)
     @assert size(endowments) == (n, m)         "Dim mismatch between A and endowments"
 
@@ -79,6 +82,8 @@ function exchange(endowments::Array{Float64,2},
     set_optimizer_attribute(model, "print_level", 0)
 
     if ρ == :linear
+        # set_optimizer_attribute(model, "nlp_scaling_method", "none")
+
         @variable(model, ψ[1:m])
         @variable(model, X[1:n, 1:m], lower_bound=0)
         @NLconstraint(model, IndividualRationality[i in 1:n, j in 1:m],
@@ -123,13 +128,23 @@ function exchange(endowments::Array{Float64,2},
     return prices, demands
 end
 
-#= 6.6.1
+"""
+    exchange(endowments, A_consumers, A_producers,
+             ρ_consumers, ρ_producers, o_producers)
+
+§6.6: Models with production. `ρ_consumers` describes
+each consumer's CES utility function, while `ρ_producers` describes the CES
+production function. Convergence is very iffy, but best when `A_consumers` is
+tall and entries of `ρ` vectors are not too close to 0 or 1.
+"""
 function production(endowments::Array{Float64,2},
                     A_consumers::Array{Float64,2},
                     A_producers::Array{Float64,2},
                     ρ_consumers::Array{Float64,1},
                     ρ_producers::Array{Float64,1},
-                    o_producers::Array{Int,1})#::Tuple{Array{Float64,1},Array{Float64,2}}
+                    o_producers::Array{Int,1})::Tuple{Array{Float64,1},
+                                                      Array{Float64,1},
+                                                      Array{Float64,2}}
 
     (n, m) = size(A_consumers)
     (l, ) = size(ρ_producers)
@@ -151,7 +166,7 @@ function production(endowments::Array{Float64,2},
     O = [o[k] == j for k in 1:l, j in 1:m]
 
     model = Model(Ipopt.Optimizer)
-    # set_optimizer_attribute(model, "print_level", 0)
+    set_optimizer_attribute(model, "print_level", 0)
     set_optimizer_attribute(model, "nlp_scaling_method", "none")
 
     @variable(model, ψ[1:m + n], lower_bound=0)
@@ -169,7 +184,7 @@ function production(endowments::Array{Float64,2},
                     exp(ψ[o[k]] * (1 - σ[k])) ≥
                     sum(A[k, j] ^ σ[k] * exp(ψ[j] * (1 - σ[k])) for j in 1:m))
     @constraint(model, MarketClearing[j in 1:m],                          # 6.13
-                    sum(Z[k, j] for k in 1:l + n) ≥
+                    sum(Z[k, j] for k in 1:l + n) ≤
                     sum(w[i, j] for i in 1:n) + sum(O[k, j] * q[k] for k in 1:l))
                                             # Equiv
                                             # + sum((o[k] == j) * q[k] for k in 1:l + n))
@@ -182,35 +197,13 @@ function production(endowments::Array{Float64,2},
 
     optimize!(model)
     prices = exp.(value.(ψ)[1:m])
+
+    # Player utility, specifically, demand of each player for her own utility item.
     demands = value.(x)[m + 1:end]
     inputs = value.(Z)[l + 1:end, :]
 
     return prices, demands, inputs
 end
 
-
-(n, m) = rand(5:10, 2)
-l = rand(5:m)
-
-endowments =  1 .+ randexp(n, m)
-A_consumers = rand(n, m)
-A_producers = rand(l, m)
-ρ_consumers = .25 .+ .5 * rand(n)
-ρ_producers = .25 .+ .5 * rand(l)
-o_producers = randperm(m)[1:l]          # Index of what producers produce.
-
-
-o = vcat(o_producers, m .+ (1:n))
-
-O = [o[k] == j for k in 1:l, j in 1:m]
-
-
-
-prices, demands, inputs = production(endowments, A_consumers, A_producers,
-                             ρ_consumers, ρ_producers, o_producers)
-println(inputs * prices)
-println(endowments * prices)
-
-=#
 
 end

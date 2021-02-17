@@ -28,7 +28,7 @@ using MarketEquilibria
 
             A ./= sum(A, dims=2)         # Required by Cobb–Douglas family
             X, prices = homogeneousfisher(endowments, A, supplies, :cobb_douglas)
-            @test -endowments ≈ X * prices atol=1e-5
+            @test -endowments ≈ X * prices atol=1e-4
         end
     end
 
@@ -42,7 +42,7 @@ using MarketEquilibria
 
             A ./= sum(A, dims=2)
             X, prices = homogeneousfisher(endowments, A, supplies, :leontief)
-            @test -endowments ≈ X * prices atol=1e-5
+            @test -endowments ≈ X * prices atol=1e-4
         end
     end
 
@@ -83,14 +83,16 @@ end
 
     @testset "Linear" begin
         for _ in 1:samp
-            (n, m) = rand(10:50, 2)
+            (n, m) = rand(20:50, 2)
 
             endowments =  1 .+ randexp(n, m)
-            A = rand(n, m)
+            A = randexp(n, m)
+            A .*= (rand(n, m) .< .75)
+            A ./= sum(A, dims=2)
 
             prices, demands = exchange(endowments, A, :linear)
 
-            @test all(demands * prices .≥ endowments * prices .- 10e-4)
+            @test all(demands * prices .≥ endowments * prices .- 10e-2)
         end
     end
 
@@ -106,5 +108,40 @@ end
 
             @test all(demands * prices .≥ endowments * prices .- 10e-4)
         end
+    end
+end
+
+
+@testset "CES production and exchange" begin
+    samp = 10
+
+    for i in 1:samp
+        n = rand(5:20)
+        m = rand(4:n)       # m > n case doesn't converge well
+        l = rand(3:m)       # l > m makes no sense
+
+        endowments =  1 .+ randexp(n, m)
+        A_consumers = rand(n, m)
+        A_consumers ./= sum(A_consumers, dims=2)
+
+        A_producers = rand(l, m)
+        A_producers ./= sum(A_producers, dims=2)
+
+        ρ_consumers = .1 .+ .8 * rand(n)
+        ρ_producers = .1 .+ .8 * rand(l)
+
+        # Index of what producers produce. Use perm here so none are redundant.
+        o_producers = randperm(m)[1:l]
+
+        # Can't use your output as an input. Unclear if this affects convergence.
+        for (k, j) in enumerate(o_producers)
+            A_producers
+            A_producers[k, j] = 0
+        end
+
+        prices, demands, inputs = production(endowments, A_consumers, A_producers,
+                                             ρ_consumers, ρ_producers, o_producers)
+
+        @test all(inputs * prices .≈ endowments * prices)
     end
 end
