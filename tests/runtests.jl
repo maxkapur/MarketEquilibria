@@ -78,6 +78,23 @@ using MarketEquilibria
 end
 
 
+@testset "Tâtonnement process for exchange economies" begin
+    samp = 10
+
+    for _ in 1:samp
+        (n, m) = rand(5:10, 2)
+
+        W = rand(n, m)      # Endowments
+        A = rand(n, m)      # Utility params
+        ρ = 1 .- randexp(n)
+
+        prices, demands = tatonnement(W, A, ρ, nothing)
+
+        @test W * prices ≈ demands * prices atol=1e-4
+    end
+end
+
+
 @testset "Convex programs for exchange economies" begin
     samp = 10
 

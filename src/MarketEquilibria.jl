@@ -4,7 +4,7 @@ using Random
 using JuMP
 using Ipopt
 
-export homogeneousfisher, exchange, production
+export homogeneousfisher, tatonnement, exchange, production
 
 """
     homogeneousfisher(endowments, A, supplies, form, ρ)
@@ -62,6 +62,103 @@ function homogeneousfisher(endowments::Array{Float64,1},
 
     optimize!(model)
     return value.(X), dual.(Supply)
+end
+
+
+"""
+    tatonnement(endowments, A, ρ, π0;
+                η=1e-4, δ=0.5, α=0.5, verbose=false, maxit=1000, tol=1e-5)
+
+§6.3.1.B: The Discrete Tâtonnement Process. Simulate a bidding process in search
+of equilibrium prices for CES exchange.
+
+Price update step is quite different from the book: I *multiply* prices
+entrywise by the excess demand: `π .*= exp.(δ * Z * k ^ -α)`. This works pretty well.
+
+`η` is a lower bound on the prices before normalization.
+"""
+function tatonnement(endowments ::AbstractArray{<:AbstractFloat,2},
+                     A          ::AbstractArray{<:AbstractFloat,2},
+                     ρ          ::AbstractArray{<:AbstractFloat,1},
+                     π0         ::Union{AbstractArray{<:AbstractFloat,1}, Nothing};
+                     η          ::AbstractFloat=1e-4,
+                     δ          ::AbstractFloat=0.5,
+                     α          ::AbstractFloat=0.4,
+                     verbose    ::Bool=false,
+                     maxit      ::Int=2000,
+                     tol        ::AbstractFloat=1e-5)::Tuple{Array{Float64,1},
+                                                             Array{Float64,2}}
+
+    (n, m) = size(A)
+    @assert (n, m) == size(endowments)
+    W = endowments      # sorry
+
+    @assert (n, )  == size(ρ)
+    @assert all(ρ .< 1)
+    @assert all(0 .< (tol, η, δ, α) .< 1)
+
+    if π0 == nothing
+        π0 = rand(m)
+    end
+
+    @assert (m, )  == size(π0)
+
+    total_supply = sum(W, dims=1)
+    # Express utility as fractions of endowment
+    A .*= total_supply
+    # So we can normalize W
+    W ./= total_supply
+
+    σ = 1 ./ (1 .- ρ)
+    π_LB = η / (4 * n)
+    π_UB = 1 + π_LB
+    π_LB_tight = η / (2 * n)
+
+    π = copy(π0)
+    D = zeros(Float64, n, m)
+    Z = zeros(Float64, m)
+
+    for k in 1:maxit
+        # Oracle that computes player demand under CES (eq. 6.7, p. 149)
+        for i in 1:n, j in 1:m
+            D[i, j] = A[i, j] ^ σ[i] * sum(π[k] * W[i, k] for k in 1:m) /
+                       (π[j] ^ σ[i] * sum((A[i, k] * π[k] ^ -ρ[i]) ^ σ[i] for k in 1:m))
+        end
+
+        for j in 1:m
+            # Total supply, after normalization, is ones
+            Z[j] = sum(D[i, j] for i in 1:n) - 1
+        end
+
+        if NaN in Z || all(-tol .< Z .< tol)
+            break
+        end
+
+        if verbose
+            println("Iteration $k")
+            println("  Current prices: ", round.(π, digits=5))
+            println("  Excess demand:  ", round.(Z, digits=5))
+        end
+
+        # This equilibrium step process is completely different from the book.
+        # Just something that makes intuitive sense. Book is unclear on how to
+        # calculate step size.
+        if all(π_LB .≤ π .≤ π_UB)
+            verbose ? println("  Step toward equilibrium") : nothing
+            π .*= exp.(δ * Z * k ^ -α)
+        else                             # Bottom of p. 144
+            verbose ? println("  Regularization step") : nothing
+            for j in 1:m
+                if π[j] > 1
+                    π[j] = 1
+                elseif π[j] < π_LB_tight
+                    π[j] = π_LB_tight
+                end
+            end
+        end
+    end
+
+    return π ./ sum(π), D
 end
 
 
